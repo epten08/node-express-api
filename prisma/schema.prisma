@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Example User model - modify or remove as needed
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  refreshToken String?
+  passwordResetToken String?   
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Add relations here
+  posts Post[]
+}
+
+// Add more models as your app grows
+model Post {
+  id        String   @id @default(cuid())
+  title     String
+  content   String?
+  published Boolean  @default(false)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
