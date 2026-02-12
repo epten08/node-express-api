@@ -1,6 +1,7 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { authService } from '../services/auth.service.js';
 import { sendSuccess } from '../utils/response.js';
+import { toUserProfile } from '../utils/userProfile.js';
 import type {
   RegistrationInput,
   LoginInput,
@@ -61,8 +62,7 @@ export class AuthController {
   async me(req: Request, res: Response, next: NextFunction) {
     try {
       const user = req.user!;
-      const { password, refreshToken, passwordResetToken, ...safeUser } = user;
-      sendSuccess(res, safeUser, 'User retrieved successfully');
+      sendSuccess(res, toUserProfile(user), 'User retrieved successfully');
     } catch (error) {
       next(error);
     }

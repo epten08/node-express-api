@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import type { RegistrationInput, LoginInput, RefreshTokenInput } from '../validators/auth.validator.js';
 import bcrypt from 'bcrypt';
 import jwt, { type SignOptions } from 'jsonwebtoken';
+import { toUserProfile } from '../utils/userProfile.js';
 
 interface TokenPayload {
   userId: string;
@@ -13,9 +14,33 @@ interface TokenPayload {
 interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+  expiresIn: number;
+  tokenType: 'Bearer';
 }
 
 export class AuthService {
+  private getTokenMetadata() {
+    return {
+      expiresIn: 3600,
+      tokenType: 'Bearer' as const,
+    };
+  }
+
+  private getUserNames(data: RegistrationInput) {
+    if (data.firstName) {
+      return {
+        firstName: data.firstName.trim(),
+        lastName: data.lastName?.trim() || '',
+      };
+    }
+
+    const [first = '', ...rest] = (data.name ?? '').trim().split(/\s+/);
+    return {
+      firstName: first,
+      lastName: rest.join(' '),
+    };
+  }
+
   private generateTokens(userId: string, email: string): AuthTokens {
     const payload: TokenPayload = { userId, email };
 
@@ -29,8 +54,14 @@ export class AuthService {
 
     const accessToken = jwt.sign(payload, config.jwt.secret, accessTokenOptions);
     const refreshToken = jwt.sign(payload, config.jwt.secret, refreshTokenOptions);
+    const metadata = this.getTokenMetadata();
 
-    return { accessToken, refreshToken };
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: metadata.expiresIn,
+      tokenType: metadata.tokenType,
+    };
   }
 
   async register(data: RegistrationInput) {
@@ -43,11 +74,17 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
+    const { firstName, lastName } = this.getUserNames(data);
+    const name = `${firstName} ${lastName}`.trim();
 
     const user = await prisma.user.create({
       data: {
-        name: data.name,
+        name: name || null,
+        firstName: firstName || null,
+        lastName: lastName || null,
         email: data.email,
+        phone: data.phone,
+        deviceId: data.deviceId,
         password: hashedPassword,
       },
     });
@@ -59,11 +96,12 @@ export class AuthService {
       data: { refreshToken: tokens.refreshToken },
     });
 
-    const { password: _, refreshToken: __, ...userWithoutSensitive } = user;
-
     return {
-      user: userWithoutSensitive,
-      ...tokens,
+      user: toUserProfile(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+      tokenType: tokens.tokenType,
     };
   }
 
@@ -83,16 +121,20 @@ export class AuthService {
 
     const tokens = this.generateTokens(user.id, user.email);
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: tokens.refreshToken },
+      data: {
+        refreshToken: tokens.refreshToken,
+        deviceId: data.deviceId ?? user.deviceId,
+      },
     });
 
-    const { password: _, refreshToken: __, ...userWithoutSensitive } = user;
-
     return {
-      user: userWithoutSensitive,
-      ...tokens,
+      user: toUserProfile(updatedUser),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+      tokenType: tokens.tokenType,
     };
   }
 
@@ -115,7 +157,16 @@ export class AuthService {
         data: { refreshToken: tokens.refreshToken },
       });
 
-      return tokens;
+      return {
+        access_token: tokens.accessToken,
+        refresh_token: tokens.refreshToken,
+        expires_in: tokens.expiresIn,
+        token_type: tokens.tokenType,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+        tokenType: tokens.tokenType,
+      };
     } catch (error) {
       if (error instanceof AppError) {
         throw error;

@@ -4,6 +4,9 @@ import { sendSuccess } from '../utils/response.js';
 import type {
   CreateUserInput,
   UpdateUserInput,
+  UpdateProfileInput,
+  ChangePasswordInput,
+  DeleteAccountInput,
   ListUsersQuery,
 } from '../validators/user.validator.js';
 
@@ -48,6 +51,54 @@ export class UserController {
     try {
       await userService.delete(req.params.id);
       sendSuccess(res, null, 'User deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const profile = await userService.getProfile(req.user!.id);
+      sendSuccess(res, profile, 'User profile retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateProfile(
+    req: Request<unknown, unknown, UpdateProfileInput>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const profile = await userService.updateProfile(req.user!.id, req.body);
+      sendSuccess(res, profile, 'User profile updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async changePassword(
+    req: Request<unknown, unknown, ChangePasswordInput>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      await userService.changePassword(req.user!.id, req.body);
+      sendSuccess(res, { message: 'Password changed successfully' }, 'Password changed successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteAccount(
+    req: Request<unknown, unknown, DeleteAccountInput>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      await userService.deleteAccount(req.user!.id, req.body);
+      sendSuccess(res, { message: 'Account deleted successfully' }, 'Account deleted successfully');
     } catch (error) {
       next(error);
     }

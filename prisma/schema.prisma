@@ -11,6 +11,23 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  firstName String?
+  lastName  String?
+  avatar    String?
+  phone     String?
+  dateOfBirth DateTime?
+  gender      String?
+  addressStreet     String?
+  addressCity       String?
+  addressState      String?
+  addressCountry    String?
+  addressPostalCode String?
+  preferencesLanguage      String  @default("en")
+  preferencesTheme         String  @default("system")
+  preferencesNotifications Boolean @default(true)
+  emailVerified Boolean @default(false)
+  phoneVerified Boolean @default(false)
+  deviceId      String?
   password  String
   refreshToken String?
   passwordResetToken String?   

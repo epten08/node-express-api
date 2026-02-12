@@ -12,6 +12,13 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-express_api}?schema=public
       - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-30d}
+    command:
+      - sh
+      - -c
+      - npx prisma db push --schema=prisma/schema.prisma --url="$$DATABASE_URL" && npm run dev
     volumes:
       - ./src:/app/src
       - ./prisma:/app/prisma

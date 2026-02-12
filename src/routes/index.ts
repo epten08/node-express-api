@@ -11,6 +11,7 @@ const v1Router = Router();
 // Mount route modules
 v1Router.use('/auth', authRouter);
 v1Router.use('/users', userRouter);
+v1Router.use('/user', userRouter);
 v1Router.use('/posts', postRouter);
 
 // Mount versioned router
