@@ -1,0 +1,134 @@
+name: Node API CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "prisma/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "deploy/**"
+      - ".github/workflows/node-api-cicd.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+  VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH || '/opt/node-express-api' }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_uri: ${{ steps.meta.outputs.image_uri }}
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1 || \
+          aws ecr create-repository --repository-name "$ECR_REPOSITORY"
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image metadata
+        id: meta
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::7}"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image_uri }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+  deploy-to-vps:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy deploy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          source: "deploy/docker-compose.vps.yml,deploy/.env.vps.example"
+          target: ${{ env.VPS_DEPLOY_PATH }}
+          strip_components: 1
+
+      - name: Pull and restart on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
+          API_IMAGE: ${{ needs.build-and-push.outputs.image_uri }}
+          VPS_DEPLOY_PATH: ${{ env.VPS_DEPLOY_PATH }}
+          APP_ENV_B64: ${{ secrets.APP_ENV_B64 }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_REGION,ECR_REGISTRY,API_IMAGE,VPS_DEPLOY_PATH,APP_ENV_B64
+          script: |
+            set -e
+            command -v docker >/dev/null 2>&1 || { echo "docker is not installed"; exit 1; }
+            docker compose version >/dev/null 2>&1 || { echo "docker compose plugin is not installed"; exit 1; }
+            command -v aws >/dev/null 2>&1 || { echo "aws cli is not installed"; exit 1; }
+            command -v base64 >/dev/null 2>&1 || { echo "base64 command is not installed"; exit 1; }
+            mkdir -p "$VPS_DEPLOY_PATH"
+            cd "$VPS_DEPLOY_PATH"
+            if [ -z "$APP_ENV_B64" ]; then
+              echo "APP_ENV_B64 GitHub secret is empty or missing."
+              exit 1
+            fi
+            printf "%s" "$APP_ENV_B64" | base64 -d > .env
+            aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml up -d db
+            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml pull api
+            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml run --rm api npx prisma migrate deploy
+            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml up -d api --remove-orphans
+            docker image prune -f

@@ -148,6 +148,20 @@ npm run lint             # Check for issues
 npm run lint:fix         # Fix issues
 ```
 
+## CI/CD (GitHub Actions + AWS ECR + VPS)
+
+This repo includes `.github/workflows/node-api-cicd.yml`.
+
+- CI: installs dependencies and runs `npm run build`
+- CD: builds Docker image, pushes to AWS ECR, then deploys on VPS over SSH
+
+Deployment files are in `deploy/`:
+- `deploy/docker-compose.vps.yml`
+- `deploy/.env.vps.example`
+- `deploy/README.md` (first-time setup and required GitHub secrets)
+
+Runtime environment variables are injected from GitHub Secret `APP_ENV_B64` during deployment.
+
 ## Adding a New Resource
 
 1. **Define the model** in `prisma/schema.prisma`
