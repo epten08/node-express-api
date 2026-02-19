@@ -29,21 +29,40 @@ export class EmailService {
       return true;
     }
 
-    // In production, implement your email provider here
-    // Examples: SendGrid, AWS SES, Resend, Nodemailer with SMTP
-    //
-    // import { Resend } from 'resend';
-    // const resend = new Resend(config.email.apiKey);
-    // await resend.emails.send({
-    //   from: this.fromEmail,
-    //   to: options.to,
-    //   subject: options.subject,
-    //   text: options.text,
-    //   html: options.html,
-    // });
+    // Production: use Mailtrap API
+    if (!config.email?.apiKey) {
+      logger.warn('EMAIL_API_KEY not configured - email not sent');
+      return false;
+    }
 
-    logger.warn('Email sending not configured for production');
-    return true;
+    try {
+      const response = await fetch('https://send.api.mailtrap.io/api/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.email.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: { email: this.fromEmail, name: this.appName },
+          to: [{ email: options.to }],
+          subject: options.subject,
+          text: options.text,
+          html: options.html,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        logger.error({ msg: 'Mailtrap API error', status: response.status, error });
+        return false;
+      }
+
+      logger.info({ msg: 'Email sent via Mailtrap', to: options.to, subject: options.subject });
+      return true;
+    } catch (error) {
+      logger.error({ msg: 'Failed to send email', error });
+      return false;
+    }
   }
 
   async sendVerificationEmail(email: string, token: string): Promise<boolean> {
