@@ -5,6 +5,8 @@ import type { RegistrationInput, LoginInput, RefreshTokenInput } from '../valida
 import bcrypt from 'bcrypt';
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { toUserProfile } from '../utils/userProfile.js';
+import { generateSecureToken, hashToken } from '../utils/token.js';
+import { emailService } from './email.service.js';
 
 interface TokenPayload {
   userId: string;
@@ -77,6 +79,11 @@ export class AuthService {
     const { firstName, lastName } = this.getUserNames(data);
     const name = `${firstName} ${lastName}`.trim();
 
+    // Generate email verification token
+    const verificationToken = generateSecureToken();
+    const hashedVerificationToken = hashToken(verificationToken);
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     const user = await prisma.user.create({
       data: {
         name: name || null,
@@ -86,6 +93,8 @@ export class AuthService {
         phone: data.phone,
         deviceId: data.deviceId,
         password: hashedPassword,
+        emailVerificationToken: hashedVerificationToken,
+        emailVerificationExpires: verificationExpires,
       },
     });
 
@@ -96,12 +105,18 @@ export class AuthService {
       data: { refreshToken: tokens.refreshToken },
     });
 
+    // Send verification email (don't await to avoid blocking response)
+    emailService.sendVerificationEmail(user.email, verificationToken).catch((err) => {
+      console.error('Failed to send verification email:', err);
+    });
+
     return {
       user: toUserProfile(user),
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       expiresIn: tokens.expiresIn,
       tokenType: tokens.tokenType,
+      message: 'Registration successful. Please check your email to verify your account.',
     };
   }
 
@@ -180,6 +195,102 @@ export class AuthService {
       where: { id: userId },
       data: { refreshToken: null },
     });
+  }
+
+  async sendVerificationEmail(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw AppError.notFound('User not found');
+    }
+
+    if (user.emailVerified) {
+      throw AppError.badRequest('Email is already verified');
+    }
+
+    const token = generateSecureToken();
+    const hashedToken = hashToken(token);
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: expires,
+      },
+    });
+
+    await emailService.sendVerificationEmail(user.email, token);
+
+    return { message: 'Verification email sent' };
+  }
+
+  async verifyEmail(token: string) {
+    const hashedToken = hashToken(token);
+
+    const user = await prisma.user.findFirst({
+      where: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      throw AppError.badRequest('Invalid or expired verification token');
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
+      },
+    });
+
+    // Send welcome email
+    const name = updatedUser.firstName || updatedUser.name || 'User';
+    await emailService.sendWelcomeEmail(updatedUser.email, name);
+
+    return {
+      message: 'Email verified successfully',
+      user: toUserProfile(updatedUser),
+    };
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return { message: 'If an account exists with this email, a verification link has been sent' };
+    }
+
+    if (user.emailVerified) {
+      throw AppError.badRequest('Email is already verified');
+    }
+
+    const token = generateSecureToken();
+    const hashedToken = hashToken(token);
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: hashedToken,
+        emailVerificationExpires: expires,
+      },
+    });
+
+    await emailService.sendVerificationEmail(user.email, token);
+
+    return { message: 'If an account exists with this email, a verification link has been sent' };
   }
 }
 

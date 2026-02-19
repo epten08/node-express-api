@@ -6,9 +6,11 @@ import type {
   RegistrationInput,
   LoginInput,
   RefreshTokenInput,
+  VerifyEmailQuery,
+  ResendVerificationInput,
 } from '../validators/auth.validator.js';
 
-type TypedRequest<TBody = unknown> = Request<unknown, unknown, TBody>;
+type TypedRequest<TBody = unknown, TQuery = unknown> = Request<unknown, unknown, TBody, TQuery>;
 
 export class AuthController {
   async register(
@@ -63,6 +65,41 @@ export class AuthController {
     try {
       const user = req.user!;
       sendSuccess(res, toUserProfile(user), 'User retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async verifyEmail(
+    req: TypedRequest<unknown, VerifyEmailQuery>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const result = await authService.verifyEmail(req.query.token as string);
+      sendSuccess(res, result, 'Email verified successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resendVerification(
+    req: TypedRequest<ResendVerificationInput>,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const result = await authService.resendVerificationEmail(req.body.email);
+      sendSuccess(res, result, result.message);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async sendVerification(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.sendVerificationEmail(req.user!.id);
+      sendSuccess(res, result, 'Verification email sent');
     } catch (error) {
       next(error);
     }

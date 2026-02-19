@@ -26,11 +26,14 @@ model User {
   preferencesTheme         String  @default("system")
   preferencesNotifications Boolean @default(true)
   emailVerified Boolean @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
   phoneVerified Boolean @default(false)
   deviceId      String?
   password  String
   refreshToken String?
-  passwordResetToken String?   
+  passwordResetToken String?
+  passwordResetExpires DateTime?   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
