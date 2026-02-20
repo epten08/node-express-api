@@ -129,7 +129,7 @@ jobs:
               echo "APP_ENV_B64 GitHub secret is empty or missing."
               exit 1
             fi
-            printf "%s" "$APP_ENV_B64" | base64 -d > .env
+            printf "%s" "$APP_ENV_B64" | base64 -d | tr -d '\r' > .env
             docker logout 2>/dev/null || true
             export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
             export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
