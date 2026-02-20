@@ -147,7 +147,7 @@ jobs:
             docker compose -f docker-compose.vps.yml up -d db
             sleep 5
             docker compose -f docker-compose.vps.yml pull api
-            source .env
+            DATABASE_URL=$(grep '^DATABASE_URL=' .env | cut -d '=' -f2-)
             docker compose -f docker-compose.vps.yml run --rm -e DATABASE_URL="$DATABASE_URL" api npx prisma migrate deploy
             docker compose -f docker-compose.vps.yml up -d api --remove-orphans
             docker image prune -f
