@@ -130,10 +130,15 @@ jobs:
               exit 1
             fi
             printf "%s" "$APP_ENV_B64" | base64 -d > .env
+            docker logout 2>/dev/null || true
             echo "Logging into ECR: $ECR_REGISTRY"
+            export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
+            export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
+            export AWS_REGION="$AWS_REGION"
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+            echo "ECR login exit code: $?"
             echo "Pulling postgres image..."
-            docker pull postgres:16-alpine
+            docker pull postgres:16-alpine || true
             echo "Starting db..."
             API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml up -d db
             API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml pull api
