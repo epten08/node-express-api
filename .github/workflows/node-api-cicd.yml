@@ -143,8 +143,11 @@ jobs:
             echo "Pulling postgres image..."
             docker pull postgres:16-alpine || true
             echo "Starting db..."
-            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml up -d db
-            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml pull api
-            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml run --rm api npx prisma migrate deploy
-            API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml up -d api --remove-orphans
+            export API_IMAGE="$API_IMAGE"
+            docker compose -f docker-compose.vps.yml up -d db
+            sleep 5
+            docker compose -f docker-compose.vps.yml pull api
+            source .env
+            docker compose -f docker-compose.vps.yml run --rm -e DATABASE_URL="$DATABASE_URL" api npx prisma migrate deploy
+            docker compose -f docker-compose.vps.yml up -d api --remove-orphans
             docker image prune -f
