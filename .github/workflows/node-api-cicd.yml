@@ -99,6 +99,7 @@ jobs:
           source: "deploy/docker-compose.vps.yml,deploy/.env.vps.example"
           target: ${{ env.VPS_DEPLOY_PATH }}
           strip_components: 1
+          debug: true
 
       - name: Pull and restart on VPS
         uses: appleboy/ssh-action@v1.2.0
