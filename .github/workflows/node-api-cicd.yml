@@ -130,7 +130,11 @@ jobs:
               exit 1
             fi
             printf "%s" "$APP_ENV_B64" | base64 -d > .env
+            echo "Logging into ECR: $ECR_REGISTRY"
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+            echo "Pulling postgres image..."
+            docker pull postgres:16-alpine
+            echo "Starting db..."
             API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml up -d db
             API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml pull api
             API_IMAGE="$API_IMAGE" docker compose -f docker-compose.vps.yml run --rm api npx prisma migrate deploy
