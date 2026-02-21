@@ -1,11 +1,11 @@
 import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL is required for Prisma operations.');
-}
+// `prisma generate` in CI does not need a live DB connection.
+// Use a placeholder URL when DATABASE_URL is not provided.
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  'postgresql://postgres:postgres@localhost:5432/express_api?schema=public';
 
 export default defineConfig({
   earlyAccess: true,
