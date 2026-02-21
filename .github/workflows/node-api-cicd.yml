@@ -147,6 +147,29 @@ jobs:
             docker compose -f docker-compose.vps.yml up -d db
             sleep 5
             docker compose -f docker-compose.vps.yml pull api
-            docker run --rm --network=node-express-api_app-network --env-file .env "$API_IMAGE" npx prisma migrate deploy
+            DB_URL_LINE=$(grep -m1 '^DATABASE_URL=' .env || true)
+            if [ -z "$DB_URL_LINE" ]; then
+              echo "DATABASE_URL is missing in .env"
+              exit 1
+            fi
+            DB_URL="${DB_URL_LINE#DATABASE_URL=}"
+            DB_URL="${DB_URL%\"}"
+            DB_URL="${DB_URL#\"}"
+            DB_URL="${DB_URL%\'}"
+            DB_URL="${DB_URL#\'}"
+            DB_URL=$(printf "%s" "$DB_URL" | tr -d '\r')
+            if [ -z "$DB_URL" ]; then
+              echo "DATABASE_URL is empty after normalization"
+              exit 1
+            fi
+            case "$DB_URL" in
+              postgresql://*|postgres://*)
+                ;;
+              *)
+                echo "DATABASE_URL must start with postgresql:// or postgres://"
+                exit 1
+                ;;
+            esac
+            docker run --rm --network=node-express-api_app-network -e DATABASE_URL="$DB_URL" "$API_IMAGE" npx prisma migrate deploy
             docker compose -f docker-compose.vps.yml up -d api --remove-orphans
             docker image prune -f
