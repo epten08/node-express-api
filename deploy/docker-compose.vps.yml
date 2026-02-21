@@ -25,8 +25,6 @@ services:
     image: postgres:16-alpine
     container_name: express-db
     restart: unless-stopped
-    ports:
-      - "${DB_PORT:-5432}:5432"
     env_file:
       - .env
     environment:
