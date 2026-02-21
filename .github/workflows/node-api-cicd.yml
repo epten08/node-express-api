@@ -134,6 +134,17 @@ jobs:
             export AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID"
             export AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY"
             export AWS_REGION="$AWS_REGION"
+            if [ -z "$ECR_REGISTRY" ] && [ -n "$API_IMAGE" ]; then
+              ECR_REGISTRY="${API_IMAGE%%/*}"
+            fi
+            if [ -z "$ECR_REGISTRY" ]; then
+              AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+              ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+            fi
+            if [ -z "$ECR_REGISTRY" ]; then
+              echo "ECR_REGISTRY is empty; cannot log into ECR"
+              exit 1
+            fi
             echo "Logging into ECR: $ECR_REGISTRY"
             aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
             echo "ECR login exit code: $?"
