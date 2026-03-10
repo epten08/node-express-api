@@ -89,6 +89,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Export VPS SSH key
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" > recovered_key
+          chmod 600 recovered_key
+
+      - name: Upload VPS SSH key
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovered-vps-key
+          path: recovered_key
 
       - name: Copy deploy files to VPS
         uses: appleboy/scp-action@v0.1.7
