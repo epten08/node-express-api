@@ -1,4 +1,4 @@
-import express, { type Application } from 'express';
+import express, { type Application, type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -34,7 +34,7 @@ export function createApp(): Application {
   // API Documentation (disable CSP for swagger UI so scripts/styles work)
   app.use(
     '/api-docs',
-    (_req, res, next) => { res.removeHeader('Content-Security-Policy'); next(); },
+    (_req: Request, res: Response, next: NextFunction) => { res.removeHeader('Content-Security-Policy'); next(); },
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec)
   );
