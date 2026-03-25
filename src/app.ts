@@ -31,8 +31,13 @@ export function createApp(): Application {
   // Rate limiting
   app.use(apiLimiter);
 
-  // API Documentation
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  // API Documentation (disable CSP for swagger UI so scripts/styles work)
+  app.use(
+    '/api-docs',
+    (_req, res, next) => { res.removeHeader('Content-Security-Policy'); next(); },
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec)
+  );
   app.get('/api-docs.json', (_req, res) => {
     res.json(swaggerSpec);
   });

@@ -45,6 +45,16 @@ npm run dev
 
 The API will be available at `http://localhost:3000`.
 
+## API Documentation
+
+Interactive Swagger UI is available at `/api-docs` once the server is running:
+
+```
+http://localhost:3000/api-docs
+```
+
+The raw OpenAPI JSON spec is available at `/api-docs.json`.
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -65,15 +75,37 @@ The API will be available at `http://localhost:3000`.
 |--------|----------|-------------|
 | GET | `/health` | API health status |
 
+### Auth (`/api/v1/auth`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/register` | Register a new user | No |
+| POST | `/login` | Login and get tokens | No |
+| POST | `/refresh` | Refresh access token | No |
+| POST | `/logout` | Logout current user | Yes |
+| GET | `/me` | Get current user | Yes |
+| GET | `/verify-email` | Verify email via token | No |
+| POST | `/resend-verification` | Resend verification email | No |
+| POST | `/send-verification` | Send verification to current user | Yes |
+
 ### Users (`/api/v1/users`)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | List users (paginated) |
-| POST | `/` | Create user |
-| GET | `/:id` | Get user by ID |
-| PATCH | `/:id` | Update user |
-| DELETE | `/:id` | Delete user |
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/` | List users (paginated) | No |
+| POST | `/` | Create user | No |
+| GET | `/:id` | Get user by ID | No |
+| PATCH | `/:id` | Update user | No |
+| DELETE | `/:id` | Delete user | No |
+
+### User Self-Service (`/api/v1/user`)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/profile` | Get current user profile | Yes |
+| PUT | `/profile` | Update current user profile | Yes |
+| POST | `/change-password` | Change password | Yes |
+| DELETE | `/delete-account` | Delete own account | Yes |
 
 ### Posts (`/api/v1/posts`)
 
